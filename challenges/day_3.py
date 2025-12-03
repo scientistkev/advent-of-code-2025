@@ -14,11 +14,26 @@ def read_file_and_turn_to_list(file_path):
 
 
 def find_invalid_ids_in_range(start, end):
+    """
+    Finds the invalid product IDs in a given range.
+
+    A product ID is considered invalid if it is an even length and
+    the first half of the digits are the same as the second half.
+
+    Parameters:
+    start (int): The start of the range.
+    end (int): The end of the range.
+
+    Returns:
+    list: A list of invalid product IDs.
+    """
     invalid_ids = []
     for product_id in range(start, end + 1):
         str_id = str(product_id)
-        if len(str_id) != len(set(str_id)):
-            invalid_ids.append(product_id)
+        if len(str_id) // 2 * 2 == len(str_id):  # Check if even length
+            mid = len(str_id) // 2
+            if str_id[:mid] == str_id[mid:]:
+                invalid_ids.append(product_id)
     return invalid_ids
 
 
