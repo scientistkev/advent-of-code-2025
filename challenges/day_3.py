@@ -54,3 +54,54 @@ if __name__ == "__main__":
     file_path = "data/day_2_input.txt"
     result = sum_invalid_ids(file_path)
     print(f"The sum of all invalid product IDs is: {result}")
+
+
+# Part 2 rules:
+# Now, an ID is invalid if it is made only of some sequence of digits repeated
+# at least twice. So, 12341234 (1234 two times), 123123123 (123 three times),
+# 1212121212 (12 five times), and 1111111 (1 seven times) are all invalid IDs.
+
+
+def find_invalid_ids_part2_in_range(start, end):
+    """
+    Finds the invalid product IDs in a given range based on the new criteria.
+
+    A product ID is considered invalid if it consists of a sequence of digits
+    repeated at least twice.
+
+    Parameters:
+    start (int): The start of the range.
+    end (int): The end of the range.
+
+    Returns:
+    list: A list of invalid product IDs.
+    """
+    invalid_ids = []
+    for product_id in range(start, end + 1):
+        str_id = str(product_id)
+        length = len(str_id)
+        for i in range(1, length // 2 + 1):
+            if length % i == 0:
+                if str_id[:i] * (length // i) == str_id:
+                    invalid_ids.append(product_id)
+                    break
+    return invalid_ids
+
+
+def sum_invalid_ids_part2(file_path):
+    ranges = read_file_and_turn_to_list(file_path)
+    total_invalid_sum = 0
+
+    for range_str in ranges:
+        start_str, end_str = range_str.split("-")
+        start, end = int(start_str), int(end_str)
+        invalid_ids = find_invalid_ids_part2_in_range(start, end)
+        total_invalid_sum += sum(invalid_ids)
+
+    return total_invalid_sum
+
+
+if __name__ == "__main__":
+    file_path = "data/day_2_input.txt"
+    result_part2 = sum_invalid_ids_part2(file_path)
+    print(f"The sum of all invalid product IDs for part 2 is: {result_part2}")
