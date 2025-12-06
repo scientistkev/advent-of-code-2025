@@ -57,3 +57,52 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+# The Elves start bringing their spoiled inventory to the trash chute at the back of the kitchen.
+
+# So that they can stop bugging you when they get new inventory, the Elves would like to know all of the IDs that the fresh ingredient ID ranges consider to be fresh. An ingredient ID is still considered fresh if it is in any range.
+
+# Now, the second section of the database (the available ingredient IDs) is irrelevant. Here are the fresh ingredient ID ranges from the above example:
+
+# 3-5
+# 10-14
+# 16-20
+# 12-18
+# The ingredient IDs that these ranges consider to be fresh are 3, 4, 5, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, and 20. So, in this example, the fresh ingredient ID ranges consider a total of 14 ingredient IDs to be fresh.
+
+# Process the database file again. How many ingredient IDs are considered to be fresh according to the fresh ingredient ID ranges?
+
+
+def merge_ranges(fresh_ranges):
+    sorted_ranges = sorted(fresh_ranges, key=lambda x: x[0])
+    merged_ranges = []
+    current_start, current_end = sorted_ranges[0]
+
+    for start, end in sorted_ranges[1:]:
+        if start <= current_end + 1:
+            current_end = max(current_end, end)
+        else:
+            merged_ranges.append((current_start, current_end))
+            current_start, current_end = start, end
+
+    merged_ranges.append((current_start, current_end))
+    return merged_ranges
+
+
+def count_total_fresh_ids(fresh_ranges):
+    merged_ranges = merge_ranges(fresh_ranges)
+    total_fresh_count = 0
+    for start, end in merged_ranges:
+        total_fresh_count += end - start + 1
+    return total_fresh_count
+
+
+def main():
+    fresh_ranges, _ = load_data("data/day_6_input.txt")
+    total_fresh_count = count_total_fresh_ids(fresh_ranges)
+    print(f"Total number of fresh ingredient IDs: {total_fresh_count}")
+
+
+if __name__ == "__main__":
+    main()
