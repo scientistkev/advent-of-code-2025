@@ -26,3 +26,34 @@
 # So, in this example, 3 of the available ingredient IDs are fresh.
 
 # Process the database file from the new inventory management system. How many of the available ingredient IDs are fresh?
+
+
+def load_data(path):
+    with open(path, "r") as f:
+        fresh_ranges_str, available_ids_str = f.read().strip().split("\n\n")
+    fresh_ranges = []
+    for line in fresh_ranges_str.split("\n"):
+        start, end = map(int, line.split("-"))
+        fresh_ranges.append((start, end))
+    available_ids = list(map(int, available_ids_str.split("\n")))
+    return fresh_ranges, available_ids
+
+
+def count_fresh_ids(fresh_ranges, available_ids):
+    fresh_count = 0
+    for ingredient_id in available_ids:
+        for start, end in fresh_ranges:
+            if start <= ingredient_id <= end:
+                fresh_count += 1
+                break
+    return fresh_count
+
+
+def main():
+    fresh_ranges, available_ids = load_data("data/day_6_input.txt")
+    fresh_count = count_fresh_ids(fresh_ranges, available_ids)
+    print(f"Number of fresh ingredient IDs: {fresh_count}")
+
+
+if __name__ == "__main__":
+    main()
