@@ -28,14 +28,45 @@ def load_data(path):
 
 
 def parse_problems(lines):
-    return [line.split(" ") for line in lines]
+    # Split each line by spaces and filter out empty strings
+    # This creates a list of lists, where each inner list represents a row
+    rows = []
+    for line in lines:
+        items = [item for item in line.split(" ") if item]
+        rows.append(items)
+    
+    # Find the maximum number of columns (problems)
+    max_cols = max(len(row) for row in rows) if rows else 0
+    
+    # The last row contains operations, all other rows contain numbers
+    operations_row = rows[-1] if rows else []
+    number_rows = rows[:-1] if len(rows) > 1 else []
+    
+    # Parse each column (problem)
+    problems = []
+    for col_idx in range(max_cols):
+        # Collect numbers from all number rows for this column
+        numbers = []
+        for row in number_rows:
+            if col_idx < len(row):
+                try:
+                    numbers.append(int(row[col_idx]))
+                except ValueError:
+                    # Skip if not a valid number
+                    pass
+        
+        # Get operation from the operations row
+        operation = operations_row[col_idx] if col_idx < len(operations_row) else None
+        
+        if numbers and operation:
+            problems.append((numbers, operation))
+    
+    return problems
 
 
 def solve_problems(problems):
     total = 0
-    for problem in problems:
-        numbers = list(map(int, problem[:-1]))
-        operation = problem[-1]
+    for numbers, operation in problems:
         if operation == "+":
             total += sum(numbers)
         elif operation == "*":
