@@ -282,90 +282,46 @@ def count_timelines(grid):
     rows = len(grid)
     cols = len(grid[0])
     
-    # Find the starting position 'S'
+    # Find the starting position 'S' and build splitters map
     start_row = 0
     start_col = 0
+    splitters = {}  # row -> set of columns with splitters
+    
     for i in range(rows):
         for j in range(cols):
             if grid[i][j] == 'S':
                 start_row = i
                 start_col = j
-                break
+            if grid[i][j] == '^':
+                if i not in splitters:
+                    splitters[i] = set()
+                splitters[i].add(j)
     
-    # Track active beams with counts: (row, col) -> number of timelines at this position
-    # Multiple timelines can be at the same position
-    active_beams = Counter([(start_row, start_col)])
-    # Track all end positions - positions where particles exit the grid
-    end_positions = set()
+    # Use memoization to cache results
+    # Returns the number of timelines (total paths) reachable from (r, c)
+    from functools import cache
     
-    # Simulate beam propagation step by step
-    # At each step, all beams move down one position
-    # When a beam hits a splitter, it's removed and two new beams are created
-    while active_beams:
-        next_beams = Counter()
+    @cache
+    def recurse(r: int, c: int) -> int:
+        """Returns the number of timelines (total paths) reachable from (r, c)"""
+        # If we've reached the bottom, this is one timeline
+        if r >= rows:
+            return 1
         
-        for (beam_row, beam_col), count in active_beams.items():
-            # Move beam down one position
-            next_row = beam_row + 1
-            
-            # Check if beam exits the grid
-            if next_row >= rows:
-                # Each timeline exits at this column
-                end_positions.add(beam_col)
-                continue
-            
-            # Check what the beam hits at the next position
-            if grid[next_row][beam_col] == '^':
-                # Beam hits splitter - each timeline splits into two
-                left_col = beam_col - 1
-                right_col = beam_col + 1
-                
-                # New beams are created at the splitter's row (left and right of splitter)
-                if left_col >= 0:
-                    next_beams[(next_row, left_col)] += count
-                if right_col < cols:
-                    next_beams[(next_row, right_col)] += count
-            else:
-                # Beam passes through empty space, continue downward
-                next_beams[(next_row, beam_col)] += count
+        # If there's no splitter at this position, continue straight down
+        if r not in splitters or c not in splitters[r]:
+            return recurse(r + 1, c)
         
-        # Now process any beams that were created at splitter positions
-        # (they need to be handled immediately if they're also at splitters)
-        # Beams created at splitter positions are at the splitter's row and need to be processed
-        final_beams = Counter()
-        beams_to_check = dict(next_beams)
-        
-        while beams_to_check:
-            # Get a position to process
-            pos = next(iter(beams_to_check))
-            count = beams_to_check.pop(pos)
-            beam_row, beam_col = pos
-            
-            # Check if this beam is at a splitter position
-            if grid[beam_row][beam_col] == '^':
-                # Each timeline at this splitter splits into two
-                left_col = beam_col - 1
-                right_col = beam_col + 1
-                
-                if left_col >= 0:
-                    left_pos = (beam_row, left_col)
-                    beams_to_check[left_pos] = beams_to_check.get(left_pos, 0) + count
-                if right_col < cols:
-                    right_pos = (beam_row, right_col)
-                    beams_to_check[right_pos] = beams_to_check.get(right_pos, 0) + count
-            else:
-                # Beam is at empty space
-                # If it's at the last row, it will exit when moving down
-                if beam_row + 1 >= rows:
-                    end_positions.add(beam_col)
-                else:
-                    # Add it to final beams to move down in next iteration
-                    final_beams[pos] += count
-        
-        active_beams = final_beams
+        # If there is a splitter, split into left and right paths
+        result = 0
+        if c - 1 >= 0:
+            result += recurse(r + 1, c - 1)
+        if c + 1 < cols:
+            result += recurse(r + 1, c + 1)
+        return result
     
-    # Return the number of unique end positions (timelines)
-    return len(end_positions)
+    # Start from the row below S (since beam moves down from S)
+    return recurse(start_row + 1, start_col)
 
 def main():
     with open("data/day_8_input.txt") as f:
