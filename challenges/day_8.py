@@ -320,7 +320,7 @@ def count_timelines(grid):
                 left_col = beam_col - 1
                 right_col = beam_col + 1
                 
-                # New beams are created at the splitter's row
+                # New beams are created at the splitter's row (left and right of splitter)
                 if left_col >= 0:
                     next_beams[(next_row, left_col)] += count
                 if right_col < cols:
@@ -331,6 +331,7 @@ def count_timelines(grid):
         
         # Now process any beams that were created at splitter positions
         # (they need to be handled immediately if they're also at splitters)
+        # Beams created at splitter positions are at the splitter's row and need to be processed
         final_beams = Counter()
         beams_to_check = dict(next_beams)
         
@@ -339,11 +340,6 @@ def count_timelines(grid):
             pos = next(iter(beams_to_check))
             count = beams_to_check.pop(pos)
             beam_row, beam_col = pos
-            
-            # Check if beam would exit the grid
-            if beam_row >= rows:
-                end_positions.add(beam_col)
-                continue
             
             # Check if this beam is at a splitter position
             if grid[beam_row][beam_col] == '^':
@@ -358,8 +354,13 @@ def count_timelines(grid):
                     right_pos = (beam_row, right_col)
                     beams_to_check[right_pos] = beams_to_check.get(right_pos, 0) + count
             else:
-                # Beam is at empty space, add it to final beams
-                final_beams[pos] += count
+                # Beam is at empty space
+                # If it's at the last row, it will exit when moving down
+                if beam_row + 1 >= rows:
+                    end_positions.add(beam_col)
+                else:
+                    # Add it to final beams to move down in next iteration
+                    final_beams[pos] += count
         
         active_beams = final_beams
     
