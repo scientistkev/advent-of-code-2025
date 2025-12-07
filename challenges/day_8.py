@@ -139,65 +139,37 @@ def count_beam_splits(grid):
     active_beams = set([(start_row, start_col)])
     beam_splits = 0
     
-    # Simulate beam propagation
-    # Continue until no more active beams
+    # Simulate beam propagation step by step
+    # At each step, all beams move down one position
+    # When a beam hits a splitter, it's removed and two new beams are created
     while active_beams:
-        # Group beams by row to process them row by row
-        beams_by_row = {}
-        for beam_row, beam_col in active_beams:
-            if beam_row not in beams_by_row:
-                beams_by_row[beam_row] = []
-            beams_by_row[beam_row].append((beam_row, beam_col))
-        
-        # Process from top to bottom
-        new_beams = set()
-        processed_rows = set()
-        
-        for row in sorted(beams_by_row.keys()):
-            if row >= rows:
-                continue
-                
-            for beam_row, beam_col in beams_by_row[row]:
-                # Check if we've already processed this position
-                if (beam_row, beam_col) in processed_rows:
-                    continue
-                
-                # Check what's at this position
-                if grid[beam_row][beam_col] == '^':
-                    # Beam hits splitter - count the split
-                    beam_splits += 1
-                    
-                    # Create two new beams at left and right of splitter
-                    left_col = beam_col - 1
-                    right_col = beam_col + 1
-                    
-                    # New beams start at the same row as the splitter
-                    if left_col >= 0:
-                        new_beams.add((beam_row, left_col))
-                    if right_col < cols:
-                        new_beams.add((beam_row, right_col))
-                elif grid[beam_row][beam_col] == '.' or grid[beam_row][beam_col] == 'S':
-                    # Beam passes through, continue downward
-                    if beam_row + 1 < rows:
-                        new_beams.add((beam_row + 1, beam_col))
-                
-                processed_rows.add((beam_row, beam_col))
-        
-        # Move all new beams down one step (they're at the splitter row, need to move down)
-        # Actually wait - re-reading: "a new tachyon beam continues from the immediate left and from the immediate right"
-        # I think this means the beams are created at the left/right positions and immediately start moving down
-        
-        # Update active beams: new beams that will move down
         next_beams = set()
-        for beam_row, beam_col in new_beams:
-            # If this position is a splitter, we'll process it in the next iteration
-            # Otherwise, move down
-            if beam_row + 1 < rows and grid[beam_row][beam_col] != '^':
-                next_beams.add((beam_row + 1, beam_col))
-            elif grid[beam_row][beam_col] == '^':
-                # Beam is at a splitter position, process it
-                next_beams.add((beam_row, beam_col))
-            # If beam would exit grid, don't add it
+        
+        for beam_row, beam_col in active_beams:
+            # Move beam down one position
+            next_row = beam_row + 1
+            
+            # Check if beam exits the grid
+            if next_row >= rows:
+                continue
+            
+            # Check what the beam hits at the next position
+            if grid[next_row][beam_col] == '^':
+                # Beam hits splitter - count the split
+                beam_splits += 1
+                
+                # Create two new beams at left and right of splitter
+                left_col = beam_col - 1
+                right_col = beam_col + 1
+                
+                # New beams start at the splitter's row and will move down next step
+                if left_col >= 0:
+                    next_beams.add((next_row, left_col))
+                if right_col < cols:
+                    next_beams.add((next_row, right_col))
+            else:
+                # Beam passes through empty space, continue downward
+                next_beams.add((next_row, beam_col))
         
         active_beams = next_beams
     
