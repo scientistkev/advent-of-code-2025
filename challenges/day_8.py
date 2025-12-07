@@ -114,6 +114,8 @@
 
 # Analyze your manifold diagram. How many times will the beam be split?
 
+from collections import Counter
+
 def parse_input(input):
     grid = []
     for line in input.strip().split("\n"):
@@ -135,8 +137,10 @@ def count_beam_splits(grid):
                 break
     
     # Track active beams: each beam is (row, col)
-    # Beams always move downward
+    # Beams at the same position merge into one
     active_beams = set([(start_row, start_col)])
+    # Track which splitters have been hit (each splitter counts once)
+    hit_splitters = set()
     beam_splits = 0
     
     # Simulate beam propagation step by step
@@ -155,14 +159,17 @@ def count_beam_splits(grid):
             
             # Check what the beam hits at the next position
             if grid[next_row][beam_col] == '^':
-                # Beam hits splitter - count the split
-                beam_splits += 1
+                # Check if we've already counted this splitter
+                splitter_pos = (next_row, beam_col)
+                if splitter_pos not in hit_splitters:
+                    hit_splitters.add(splitter_pos)
+                    beam_splits += 1
                 
                 # Create two new beams at left and right of splitter
                 left_col = beam_col - 1
                 right_col = beam_col + 1
                 
-                # New beams start at the splitter's row and will move down next step
+                # New beams are created at the splitter's row
                 if left_col >= 0:
                     next_beams.add((next_row, left_col))
                 if right_col < cols:
@@ -171,16 +178,206 @@ def count_beam_splits(grid):
                 # Beam passes through empty space, continue downward
                 next_beams.add((next_row, beam_col))
         
-        active_beams = next_beams
+        # Now process any beams that were created at splitter positions
+        # (they need to be handled immediately if they're also at splitters)
+        final_beams = set()
+        beams_to_check = list(next_beams)
+        
+        while beams_to_check:
+            beam_row, beam_col = beams_to_check.pop(0)
+            
+            # Check if this beam is at a splitter position
+            if grid[beam_row][beam_col] == '^':
+                # Check if we've already counted this splitter
+                splitter_pos = (beam_row, beam_col)
+                if splitter_pos not in hit_splitters:
+                    hit_splitters.add(splitter_pos)
+                    beam_splits += 1
+                
+                # Create two new beams at left and right
+                left_col = beam_col - 1
+                right_col = beam_col + 1
+                
+                if left_col >= 0:
+                    beams_to_check.append((beam_row, left_col))
+                if right_col < cols:
+                    beams_to_check.append((beam_row, right_col))
+            else:
+                # Beam is at empty space, add it to final beams
+                final_beams.add((beam_row, beam_col))
+        
+        active_beams = final_beams
     
     return beam_splits
+
+# --- Part Two ---
+# With your analysis of the manifold complete, you begin fixing the teleporter. However, as you open the side of the teleporter to replace the broken manifold, you are surprised to discover that it isn't a classical tachyon manifold - it's a quantum tachyon manifold.
+
+# With a quantum tachyon manifold, only a single tachyon particle is sent through the manifold. A tachyon particle takes both the left and right path of each splitter encountered.
+
+# Since this is impossible, the manual recommends the many-worlds interpretation of quantum tachyon splitting: each time a particle reaches a splitter, it's actually time itself which splits. In one timeline, the particle went left, and in the other timeline, the particle went right.
+
+# To fix the manifold, what you really need to know is the number of timelines active after a single particle completes all of its possible journeys through the manifold.
+
+# In the above example, there are many timelines. For instance, there's the timeline where the particle always went left:
+
+# .......S.......
+# .......|.......
+# ......|^.......
+# ......|........
+# .....|^.^......
+# .....|.........
+# ....|^.^.^.....
+# ....|..........
+# ...|^.^...^....
+# ...|...........
+# ..|^.^...^.^...
+# ..|............
+# .|^...^.....^..
+# .|.............
+# |^.^.^.^.^...^.
+# |..............
+# Or, there's the timeline where the particle alternated going left and right at each splitter:
+
+# .......S.......
+# .......|.......
+# ......|^.......
+# ......|........
+# ......^|^......
+# .......|.......
+# .....^|^.^.....
+# ......|........
+# ....^.^|..^....
+# .......|.......
+# ...^.^.|.^.^...
+# .......|.......
+# ..^...^|....^..
+# .......|.......
+# .^.^.^|^.^...^.
+# ......|........
+# Or, there's the timeline where the particle ends up at the same point as the alternating timeline, but takes a totally different path to get there:
+
+# .......S.......
+# .......|.......
+# ......|^.......
+# ......|........
+# .....|^.^......
+# .....|.........
+# ....|^.^.^.....
+# ....|..........
+# ....^|^...^....
+# .....|.........
+# ...^.^|..^.^...
+# ......|........
+# ..^..|^.....^..
+# .....|.........
+# .^.^.^|^.^...^.
+# ......|........
+# In this example, in total, the particle ends up on 40 different timelines.
+
+# Apply the many-worlds interpretation of quantum tachyon splitting to your manifold diagram. In total, how many different timelines would a single tachyon particle end up on?
+
+
+def count_timelines(grid):
+    rows = len(grid)
+    cols = len(grid[0])
+    
+    # Find the starting position 'S'
+    start_row = 0
+    start_col = 0
+    for i in range(rows):
+        for j in range(cols):
+            if grid[i][j] == 'S':
+                start_row = i
+                start_col = j
+                break
+    
+    # Track active beams with counts: (row, col) -> number of timelines at this position
+    # Multiple timelines can be at the same position
+    active_beams = Counter([(start_row, start_col)])
+    # Track all end positions - positions where particles exit the grid
+    end_positions = set()
+    
+    # Simulate beam propagation step by step
+    # At each step, all beams move down one position
+    # When a beam hits a splitter, it's removed and two new beams are created
+    while active_beams:
+        next_beams = Counter()
+        
+        for (beam_row, beam_col), count in active_beams.items():
+            # Move beam down one position
+            next_row = beam_row + 1
+            
+            # Check if beam exits the grid
+            if next_row >= rows:
+                # Each timeline exits at this column
+                end_positions.add(beam_col)
+                continue
+            
+            # Check what the beam hits at the next position
+            if grid[next_row][beam_col] == '^':
+                # Beam hits splitter - each timeline splits into two
+                left_col = beam_col - 1
+                right_col = beam_col + 1
+                
+                # New beams are created at the splitter's row
+                if left_col >= 0:
+                    next_beams[(next_row, left_col)] += count
+                if right_col < cols:
+                    next_beams[(next_row, right_col)] += count
+            else:
+                # Beam passes through empty space, continue downward
+                next_beams[(next_row, beam_col)] += count
+        
+        # Now process any beams that were created at splitter positions
+        # (they need to be handled immediately if they're also at splitters)
+        final_beams = Counter()
+        beams_to_check = dict(next_beams)
+        
+        while beams_to_check:
+            # Get a position to process
+            pos = next(iter(beams_to_check))
+            count = beams_to_check.pop(pos)
+            beam_row, beam_col = pos
+            
+            # Check if beam would exit the grid
+            if beam_row >= rows:
+                end_positions.add(beam_col)
+                continue
+            
+            # Check if this beam is at a splitter position
+            if grid[beam_row][beam_col] == '^':
+                # Each timeline at this splitter splits into two
+                left_col = beam_col - 1
+                right_col = beam_col + 1
+                
+                if left_col >= 0:
+                    left_pos = (beam_row, left_col)
+                    beams_to_check[left_pos] = beams_to_check.get(left_pos, 0) + count
+                if right_col < cols:
+                    right_pos = (beam_row, right_col)
+                    beams_to_check[right_pos] = beams_to_check.get(right_pos, 0) + count
+            else:
+                # Beam is at empty space, add it to final beams
+                final_beams[pos] += count
+        
+        active_beams = final_beams
+    
+    # Return the number of unique end positions (timelines)
+    return len(end_positions)
 
 def main():
     with open("data/day_8_input.txt") as f:
         input_data = f.read()
     grid = parse_input(input_data)
-    result = count_beam_splits(grid)
-    print(f"Number of beam splits: {result}")
+    
+    # Part 1
+    result1 = count_beam_splits(grid)
+    print(f"Number of beam splits: {result1}")
+    
+    # Part 2
+    result2 = count_timelines(grid)
+    print(f"Number of timelines: {result2}")
 
 if __name__ == "__main__":
-    main()
+    main()  
