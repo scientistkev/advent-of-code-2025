@@ -51,8 +51,10 @@ def find_closest_pairs(boxes):
     closest_pairs = []
     for i in range(len(boxes)):
         for j in range(i + 1, len(boxes)):
-            distance = sum(abs(a - b) for a, b in zip(boxes[i], boxes[j]))
-            closest_pairs.append((i, j, distance))
+            # Calculate squared Euclidean distance for comparison (avoids floating point issues)
+            # Using squared distance preserves ordering and is faster
+            distance_sq = sum((a - b) ** 2 for a, b in zip(boxes[i], boxes[j]))
+            closest_pairs.append((i, j, distance_sq))
     return closest_pairs
 
 class UnionFind:
@@ -76,23 +78,21 @@ class UnionFind:
 
 def connect_circuits(boxes, num_connections=1000):
     closest_pairs = find_closest_pairs(boxes)
-    closest_pairs.sort(key=lambda x: x[2])
+    # Sort by distance, then by i, then by j for consistent ordering of ties
+    closest_pairs.sort(key=lambda x: (x[2], x[0], x[1]))
     
     uf = UnionFind(len(boxes))
-    connections_made = 0
     
-    for i, j, distance in closest_pairs:
-        if connections_made >= num_connections:
-            break
+    # Process exactly num_connections pairs (even if they don't result in a merge)
+    for i, j, distance in closest_pairs[:num_connections]:
         if uf.find(i) != uf.find(j):
             uf.union(i, j)
-            connections_made += 1
     
-    # Count circuit sizes
+    # Count circuit sizes by finding the root of each box and counting
     circuit_sizes = {}
     for i in range(len(boxes)):
         root = uf.find(i)
-        circuit_sizes[root] = uf.size[root]
+        circuit_sizes[root] = circuit_sizes.get(root, 0) + 1
     
     return list(circuit_sizes.values())
 
