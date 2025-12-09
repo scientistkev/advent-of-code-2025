@@ -111,3 +111,42 @@ if __name__ == "__main__":
     product = product_of_largest_circuits(circuit_sizes, n=3)
     print(f"Product of the sizes of the three largest circuits: {product}")
  
+
+# --- Part Two ---
+# The Elves were right; they definitely don't have enough extension cables. You'll need to keep connecting junction boxes together until they're all in one large circuit.
+
+# Continuing the above example, the first connection which causes all of the junction boxes to form a single circuit is between the junction boxes at 216,146,977 and 117,168,530. The Elves need to know how far those junction boxes are from the wall so they can pick the right extension cable; multiplying the X coordinates of those two junction boxes (216 and 117) produces 25272.
+
+# Continue connecting the closest unconnected pairs of junction boxes together until they're all in the same circuit. What do you get if you multiply together the X coordinates of the last two junction boxes you need to connect?
+
+def connect_all_boxes(boxes):
+    closest_pairs = find_closest_pairs(boxes)
+    # Sort by distance, then by i, then by j for consistent ordering of ties
+    closest_pairs.sort(key=lambda x: (x[2], x[0], x[1]))
+    uf = UnionFind(len(boxes))
+    last_pair = None
+    
+    for i, j, distance in closest_pairs:
+        if uf.find(i) != uf.find(j):
+            uf.union(i, j)
+            # Check if all boxes are now in one circuit
+            # Count unique roots - if there's only one, all boxes are connected
+            unique_roots = set(uf.find(k) for k in range(len(boxes)))
+            if len(unique_roots) == 1:
+                last_pair = (i, j)
+                break
+    
+    return last_pair
+
+if __name__ == "__main__":
+    data = load_data("data/day_9_input.txt")
+    boxes = parse_input(data)
+    last_pair = connect_all_boxes(boxes)
+    if last_pair:
+        i, j = last_pair
+        x1 = boxes[i][0]  # X coordinate of first box
+        x2 = boxes[j][0]  # X coordinate of second box
+        product = x1 * x2
+        print(f"Product of the X coordinates of the last two junction boxes: {product}")
+    else:
+        print("Error: All boxes were not connected into one circuit")
