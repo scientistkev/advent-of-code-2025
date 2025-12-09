@@ -55,28 +55,59 @@ def find_closest_pairs(boxes):
             closest_pairs.append((i, j, distance))
     return closest_pairs
 
-def find_largest_circuits(closest_pairs):
+class UnionFind:
+    def __init__(self, n):
+        self.parent = list(range(n))
+        self.size = [1] * n
+    
+    def find(self, x):
+        if self.parent[x] != x:
+            self.parent[x] = self.find(self.parent[x])
+        return self.parent[x]
+    
+    def union(self, x, y):
+        root_x = self.find(x)
+        root_y = self.find(y)
+        if root_x != root_y:
+            if self.size[root_x] < self.size[root_y]:
+                root_x, root_y = root_y, root_x
+            self.parent[root_y] = root_x
+            self.size[root_x] += self.size[root_y]
+
+def connect_circuits(boxes, num_connections=1000):
+    closest_pairs = find_closest_pairs(boxes)
     closest_pairs.sort(key=lambda x: x[2])
-    return closest_pairs[:1000]
+    
+    uf = UnionFind(len(boxes))
+    connections_made = 0
+    
+    for i, j, distance in closest_pairs:
+        if connections_made >= num_connections:
+            break
+        if uf.find(i) != uf.find(j):
+            uf.union(i, j)
+            connections_made += 1
+    
+    # Count circuit sizes
+    circuit_sizes = {}
+    for i in range(len(boxes)):
+        root = uf.find(i)
+        circuit_sizes[root] = uf.size[root]
+    
+    return list(circuit_sizes.values())
 
-def find_largest_circuits_size(closest_pairs):
-    return len(closest_pairs)
-
-def product_of_largest_circuits(largest_circuits):
-    return product(largest_circuits)
-def product(numbers):
+def product_of_largest_circuits(circuit_sizes, n=3):
+    sorted_sizes = sorted(circuit_sizes, reverse=True)
+    largest_n = sorted_sizes[:n]
     result = 1
-    for number in numbers:
-        result *= number
+    for size in largest_n:
+        result *= size
     return result
 
 if __name__ == "__main__":
     data = load_data("data/day_9_input.txt")
     boxes = parse_input(data)
-    closest_pairs = find_closest_pairs(boxes)
-    largest_circuits = find_largest_circuits(closest_pairs)
-    product = product_of_largest_circuits(largest_circuits)
+    circuit_sizes = connect_circuits(boxes, num_connections=1000)
+    product = product_of_largest_circuits(circuit_sizes, n=3)
     print(f"Product of the sizes of the three largest circuits: {product}")
-    print(f"Largest circuits: {largest_circuits}")  
-    print(f"Largest circuits size: {largest_circuits_size}")
  
