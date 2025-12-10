@@ -83,7 +83,6 @@ def load_data(path):
 
 
 def find_largest_rectangle(coordinates):
-    coord_set = set(coordinates)
     max_area = 0
     n = len(coordinates)
 
@@ -91,10 +90,10 @@ def find_largest_rectangle(coordinates):
         x1, y1 = coordinates[i]
         for j in range(i + 1, n):
             x2, y2 = coordinates[j]
+            # Two points form opposite corners if they have different x and y coordinates
             if x1 != x2 and y1 != y2:
-                if (x1, y2) in coord_set and (x2, y1) in coord_set:
-                    area = abs(x2 - x1) * abs(y2 - y1)
-                    max_area = max(max_area, area)
+                area = abs(x2 - x1) * abs(y2 - y1)
+                max_area = max(max_area, area)
 
     return max_area
 
