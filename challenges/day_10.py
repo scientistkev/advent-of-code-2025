@@ -175,123 +175,184 @@ if __name__ == "__main__":
 # ..............
 # # Using two red tiles as opposite corners, what is the largest area of any rectangle you can make using only red and green tiles?
 
-def get_green_tiles_on_lines(coordinates):
-    """Get all green tiles that connect consecutive red tiles."""
-    green_tiles = set()
+def point_in_polygon(x, y, polygon):
+    """Check if a point is inside a polygon using the ray casting algorithm."""
+    n = len(polygon)
+    inside = False
+
+    p1x, p1y = polygon[0]
+    for i in range(1, n + 1):
+        p2x, p2y = polygon[i % n]
+
+        if p1y != p2y:
+            if min(p1y, p2y) < y <= max(p1y, p2y):
+                if p1x == p2x:
+                    if x < p1x:
+                        inside = not inside
+                else:
+                    xinters = (y - p1y) * (p2x - p1x) / (p2y - p1y) + p1x
+                    if x < xinters:
+                        inside = not inside
+
+        p1x, p1y = p2x, p2y
+
+    return inside
+
+
+def get_connecting_line_tiles(coordinates):
+    """Pre-compute all tiles on lines connecting consecutive red tiles."""
+    line_tiles = set()
     n = len(coordinates)
-    
+
     for i in range(n):
         x1, y1 = coordinates[i]
-        x2, y2 = coordinates[(i + 1) % n]  # Wrap around for last to first
-        
+        x2, y2 = coordinates[(i + 1) % n]
+
         # Tiles on the same row
         if y1 == y2:
             start_x, end_x = min(x1, x2), max(x1, x2)
             for x in range(start_x, end_x + 1):
-                green_tiles.add((x, y1))
+                line_tiles.add((x, y1))
         # Tiles on the same column
         elif x1 == x2:
             start_y, end_y = min(y1, y2), max(y1, y2)
             for y in range(start_y, end_y + 1):
-                green_tiles.add((x1, y))
-    
-    return green_tiles
+                line_tiles.add((x1, y))
+
+    return line_tiles
 
 
-def point_in_polygon(x, y, polygon):
-    """Check if a point is inside a polygon using ray casting algorithm (optimized)."""
-    n = len(polygon)
-    inside = False
-    
-    p1x, p1y = polygon[0]
-    for i in range(1, n + 1):
-        p2x, p2y = polygon[i % n]
-        if p1y != p2y:
-            if y > min(p1y, p2y) and y <= max(p1y, p2y):
-                if p1x == p2x:
-                    if x <= p1x:
-                        inside = not inside
-                else:
-                    xinters = (y - p1y) * (p2x - p1x) / (p2y - p1y) + p1x
-                    if x <= xinters:
-                        inside = not inside
-        p1x, p1y = p2x, p2y
-    
-    return inside
+def build_allowed_grid(coordinates):
+    """
+    Build a grid of allowed tiles (red or green) and a 2D prefix sum over that grid.
 
-
-def get_all_green_tiles(coordinates):
-    """Get all green tiles: connecting lines + interior of the loop."""
-    # Start with red tiles and green tiles on connecting lines
+    Returns:
+        allowed (list[list[bool]]): allowed[y][x] (after offset) is True if tile is red/green.
+        prefix (list[list[int]]): 2D prefix sums over allowed grid.
+        red_tiles (set[tuple[int,int]]): set of red tile coordinates.
+        min_x, min_y (int): offsets used for grid coordinates.
+    """
     red_tiles = set(coordinates)
-    green_tiles = get_green_tiles_on_lines(coordinates)
-    
-    # Find bounding box to check interior points
-    if not coordinates:
-        return green_tiles
-    
-    min_x = min(x for x, y in coordinates)
-    max_x = max(x for x, y in coordinates)
-    min_y = min(y for x, y in coordinates)
-    max_y = max(y for x, y in coordinates)
-    
-    # Use a set for faster lookups
-    red_or_green = red_tiles | green_tiles
-    
-    # Check all points in bounding box to see if they're inside the polygon
-    # Only check points not already known to be red or green
-    for x in range(min_x, max_x + 1):
-        for y in range(min_y, max_y + 1):
-            if (x, y) not in red_or_green:
-                if point_in_polygon(x, y, coordinates):
-                    green_tiles.add((x, y))
-                    red_or_green.add((x, y))
-    
-    return green_tiles
+    line_tiles = get_connecting_line_tiles(coordinates)
+
+    xs = [x for x, _ in coordinates]
+    ys = [y for _, y in coordinates]
+    min_x, max_x = min(xs), max(xs)
+    min_y, max_y = min(ys), max(ys)
+
+    width = max_x - min_x + 1
+    height = max_y - min_y + 1
+
+    # Build allowed grid: True if red, on boundary line, or strictly inside polygon
+    allowed = [[False] * width for _ in range(height)]
+
+    for y in range(min_y, max_y + 1):
+        row_idx = y - min_y
+        for x in range(min_x, max_x + 1):
+            col_idx = x - min_x
+            pt = (x, y)
+
+            if pt in red_tiles or pt in line_tiles or point_in_polygon(x, y, coordinates):
+                allowed[row_idx][col_idx] = True
+
+    # Build 2D prefix sums over allowed
+    # prefix[ry+1][rx+1] = number of allowed tiles in [0..ry][0..rx]
+    prefix = [[0] * (width + 1) for _ in range(height + 1)]
+    for ry in range(height):
+        row_sum = 0
+        for rx in range(width):
+            if allowed[ry][rx]:
+                row_sum += 1
+            prefix[ry + 1][rx + 1] = prefix[ry][rx + 1] + row_sum
+
+    return allowed, prefix, red_tiles, min_x, min_y
 
 
-def rectangle_contains_only_red_or_green(x1, y1, x2, y2, red_tiles, green_tiles):
-    """Check if all tiles in the rectangle are either red or green."""
-    min_x, max_x = min(x1, x2), max(x1, x2)
-    min_y, max_y = min(y1, y2), max(y1, y2)
-    
-    for x in range(min_x, max_x + 1):
-        for y in range(min_y, max_y + 1):
-            if (x, y) not in red_tiles and (x, y) not in green_tiles:
-                return False
-    return True
+def rect_allowed_count(prefix, x1, y1, x2, y2, min_x, min_y):
+    """
+    Return number of allowed tiles in rectangle [x1..x2] x [y1..y2] inclusive,
+    using 2D prefix sums and coordinate offsets.
+    """
+    if x1 > x2:
+        x1, x2 = x2, x1
+    if y1 > y2:
+        y1, y2 = y2, y1
+
+    # Convert to grid indices
+    gx1 = x1 - min_x
+    gx2 = x2 - min_x
+    gy1 = y1 - min_y
+    gy2 = y2 - min_y
+
+    # Standard 2D prefix sum query
+    # Note prefix indices are 1-based relative to allowed indices
+    total = (
+        prefix[gy2 + 1][gx2 + 1]
+        - prefix[gy1][gx2 + 1]
+        - prefix[gy2 + 1][gx1]
+        + prefix[gy1][gx1]
+    )
+    return total
 
 
 def find_largest_rectangle_with_green(coordinates):
-    """Find the largest rectangle with red tiles at opposite corners, using only red and green tiles."""
-    red_tiles = set(coordinates)
-    green_tiles = get_all_green_tiles(coordinates)
-    
+    """
+    Find the largest rectangle with red tiles as opposite corners,
+    using only red and green tiles inside (including boundary).
+    """
+    if not coordinates:
+        return 0
+
+    allowed, prefix, red_tiles, min_x, min_y = build_allowed_grid(coordinates)
+
     max_area = 0
     n = len(coordinates)
-    
+
+    # Precompute all candidate red-tile pairs with their potential areas
+    pairs = []
     for i in range(n):
         x1, y1 = coordinates[i]
         for j in range(i + 1, n):
             x2, y2 = coordinates[j]
-            # Two points form opposite corners if they have different x and y coordinates
+
+            # Opposite corners of an axis-aligned rectangle only
             if x1 != x2 and y1 != y2:
-                # Check if all tiles in the rectangle are red or green
-                if rectangle_contains_only_red_or_green(x1, y1, x2, y2, red_tiles, green_tiles):
-                    # Area calculation: width * height, where both are inclusive
-                    area = (abs(x2 - x1) + 1) * (abs(y2 - y1) + 1)
-                    max_area = max(max_area, area)
-    
+                area = (abs(x2 - x1) + 1) * (abs(y2 - y1) + 1)
+                pairs.append((area, x1, y1, x2, y2))
+
+    # Sort by area descending to check larger rectangles first
+    pairs.sort(reverse=True)
+
+    for area, x1, y1, x2, y2 in pairs:
+        # Skip if this area can't beat current max
+        if area <= max_area:
+            break
+
+        # All tiles in the rectangle must be allowed
+        allowed_count = rect_allowed_count(prefix, x1, y1, x2, y2, min_x, min_y)
+        if allowed_count == area:
+            max_area = area
+
     return max_area
 
 
 def main():
     coordinates = load_data("data/day_10_input.txt")
-    largest_area = find_largest_rectangle(coordinates)
-    print(f"Largest rectangle area: {largest_area}")
-    
+
+    # Part 1 (if you have this implemented elsewhere)
+    try:
+        largest_area = find_largest_rectangle(coordinates)
+        print(f"Largest rectangle area: {largest_area}")
+    except NameError:
+        # Part 1 not defined in this file; skip it.
+        pass
+
+    # Part 2
     largest_area_with_green = find_largest_rectangle_with_green(coordinates)
-    print(f"Largest rectangle area using only red and green tiles: {largest_area_with_green}")
+    print(
+        "Largest rectangle area using only red and green tiles: "
+        f"{largest_area_with_green}"
+    )
 
 
 if __name__ == "__main__":
