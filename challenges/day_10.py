@@ -92,7 +92,9 @@ def find_largest_rectangle(coordinates):
             x2, y2 = coordinates[j]
             # Two points form opposite corners if they have different x and y coordinates
             if x1 != x2 and y1 != y2:
-                area = abs(x2 - x1) * abs(y2 - y1)
+                # Area calculation: width * height, where both are inclusive
+                # If corners are at x1 and x2, the width is |x2-x1|+1 (inclusive)
+                area = (abs(x2 - x1) + 1) * (abs(y2 - y1) + 1)
                 max_area = max(max_area, area)
 
     return max_area
