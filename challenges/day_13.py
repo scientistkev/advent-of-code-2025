@@ -1,4 +1,4 @@
-# --- Day 12: Christmas Tree Farm ---
+# --- Day 13: Christmas Tree Farm ---
 # You're almost out of time, but there can't be much left to decorate. Although there are no stairs, elevators, escalators, tunnels, chutes, teleporters, firepoles, or conduits here that would take you deeper into the North Pole base, there is a ventilation duct. You jump in.
 
 # After bumping around for a few minutes, you emerge into a large, well-lit cavern full of Christmas trees!
@@ -82,3 +82,216 @@
 
 # Consider the regions beneath each tree and the presents the Elves would like to fit into each of them. How many of the regions can fit all of the presents listed?
 
+def load_data(path):
+    with open(path, "r") as f:
+        return f.read().strip()
+
+def parse_shapes(data):
+    """Parse present shapes from input."""
+    shapes = {}
+    lines = data.split('\n')
+    i = 0
+    while i < len(lines):
+        line = lines[i].strip()
+        if not line:
+            i += 1
+            continue
+        # Check if this is a shape definition (e.g., "0:")
+        if ':' in line and line.split(':')[0].strip().isdigit():
+            shape_idx = int(line.split(':')[0].strip())
+            shape_lines = []
+            i += 1
+            # Read shape lines until we hit a blank line or another shape/region definition
+            while i < len(lines):
+                next_line = lines[i].strip()
+                if not next_line:
+                    break
+                # Check if next line is a new shape or region definition
+                if ':' in next_line and (next_line.split(':')[0].strip().isdigit() or 'x' in next_line.split(':')[0]):
+                    break
+                if next_line and ('#' in next_line or '.' in next_line):
+                    shape_lines.append(next_line)
+                    i += 1
+                else:
+                    break
+            if shape_lines:
+                shapes[shape_idx] = shape_lines
+        else:
+            i += 1
+    return shapes
+
+def parse_regions(data):
+    """Parse region requirements from input."""
+    regions = []
+    lines = data.split('\n')
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+        # Check if this is a region definition (e.g., "12x5: 1 0 1 0 2 2")
+        if 'x' in line and ':' in line:
+            parts = line.split(':')
+            dims = parts[0].strip()
+            counts_str = parts[1].strip()
+            width, length = map(int, dims.split('x'))
+            counts = list(map(int, counts_str.split()))
+            regions.append((width, length, counts))
+    return regions
+
+def rotate_shape(shape):
+    """Rotate shape 90 degrees clockwise."""
+    if not shape:
+        return []
+    rows = len(shape)
+    cols = len(shape[0])
+    rotated = []
+    for c in range(cols):
+        new_row = ''.join(shape[r][c] for r in range(rows - 1, -1, -1))
+        rotated.append(new_row)
+    return rotated
+
+def flip_shape(shape):
+    """Flip shape horizontally."""
+    return [row[::-1] for row in shape]
+
+def get_all_variants(shape):
+    """Get all rotations and flips of a shape."""
+    variants = set()
+    
+    # Generate all 4 rotations
+    current = shape
+    for _ in range(4):
+        # Convert to tuple for hashing
+        variant_tuple = tuple(current)
+        variants.add(variant_tuple)
+        current = rotate_shape(current)
+    
+    # Generate all 4 rotations of flipped version
+    flipped = flip_shape(shape)
+    current = flipped
+    for _ in range(4):
+        variant_tuple = tuple(current)
+        variants.add(variant_tuple)
+        current = rotate_shape(current)
+    
+    return [list(v) for v in variants]
+
+def get_shape_cells(shape, row_offset, col_offset):
+    """Get set of (row, col) positions occupied by shape when placed at offset."""
+    cells = set()
+    for r, row in enumerate(shape):
+        for c, char in enumerate(row):
+            if char == '#':
+                cells.add((row_offset + r, col_offset + c))
+    return cells
+
+def can_place_shape(grid, shape, row, col, width, length):
+    """Check if shape can be placed at (row, col) position."""
+    shape_rows = len(shape)
+    shape_cols = len(shape[0])
+    
+    # Check bounds
+    if row + shape_rows > length or col + shape_cols > width:
+        return False
+    
+    # Check if shape cells overlap with already occupied cells
+    for r in range(shape_rows):
+        for c in range(shape_cols):
+            if shape[r][c] == '#':
+                if grid[row + r][col + c] != '.':
+                    return False
+    
+    return True
+
+def place_shape(grid, shape, row, col, shape_id):
+    """Place shape on grid at (row, col) position."""
+    shape_rows = len(shape)
+    shape_cols = len(shape[0])
+    
+    for r in range(shape_rows):
+        for c in range(shape_cols):
+            if shape[r][c] == '#':
+                grid[row + r][col + c] = shape_id
+
+def remove_shape(grid, shape, row, col):
+    """Remove shape from grid at (row, col) position."""
+    shape_rows = len(shape)
+    shape_cols = len(shape[0])
+    
+    for r in range(shape_rows):
+        for c in range(shape_cols):
+            if shape[r][c] == '#':
+                grid[row + r][col + c] = '.'
+
+def solve_region(width, length, shape_variants_list, required_counts):
+    """Try to fit all required shapes into a region using backtracking."""
+    # Create grid (length x width)
+    grid = [['.' for _ in range(width)] for _ in range(length)]
+    
+    # Flatten shape variants and required counts into a list of shapes to place
+    shapes_to_place = []
+    for shape_idx, count in enumerate(required_counts):
+        for _ in range(count):
+            shapes_to_place.append((shape_idx, shape_variants_list[shape_idx]))
+    
+    if not shapes_to_place:
+        return True
+    
+    def backtrack(shape_idx):
+        if shape_idx >= len(shapes_to_place):
+            return True
+        
+        shape_type, variants = shapes_to_place[shape_idx]
+        
+        # Try each variant of this shape
+        for variant in variants:
+            # Try placing at each position
+            for row in range(length):
+                for col in range(width):
+                    if can_place_shape(grid, variant, row, col, width, length):
+                        # Place the shape
+                        place_shape(grid, variant, row, col, shape_type)
+                        
+                        # Recursively try to place remaining shapes
+                        if backtrack(shape_idx + 1):
+                            return True
+                        
+                        # Backtrack: remove the shape
+                        remove_shape(grid, variant, row, col)
+        
+        return False
+    
+    return backtrack(0)
+
+def solve(data):
+    """Main solving function."""
+    # Parse shapes and regions
+    shapes = parse_shapes(data)
+    regions = parse_regions(data)
+    
+    # Generate all variants for each shape
+    shape_variants = {}
+    for shape_idx, shape in shapes.items():
+        shape_variants[shape_idx] = get_all_variants(shape)
+    
+    # Count how many regions can fit all their presents
+    count = 0
+    for width, length, required_counts in regions:
+        # Get variants for shapes that are needed
+        max_shape_idx = len(required_counts) - 1
+        shape_variants_list = []
+        for i in range(max_shape_idx + 1):
+            if i in shape_variants:
+                shape_variants_list.append(shape_variants[i])
+            else:
+                shape_variants_list.append([])
+        
+        if solve_region(width, length, shape_variants_list, required_counts):
+            count += 1
+    
+    return count
+
+if __name__ == "__main__":
+    data = load_data("data/day_13_input.txt")
+    result = solve(data)
+    print(f"Number of regions that can fit all their presents: {result}")
