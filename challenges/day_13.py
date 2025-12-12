@@ -176,15 +176,6 @@ def get_all_variants(shape):
     
     return [list(v) for v in variants]
 
-def get_shape_cells(shape, row_offset, col_offset):
-    """Get set of (row, col) positions occupied by shape when placed at offset."""
-    cells = set()
-    for r, row in enumerate(shape):
-        for c, char in enumerate(row):
-            if char == '#':
-                cells.add((row_offset + r, col_offset + c))
-    return cells
-
 def can_place_shape(grid, shape, row, col, width, length):
     """Check if shape can be placed at (row, col) position."""
     shape_rows = len(shape)
@@ -223,19 +214,38 @@ def remove_shape(grid, shape, row, col):
             if shape[r][c] == '#':
                 grid[row + r][col + c] = '.'
 
+def get_shape_cells_set(shape, row_offset, col_offset):
+    """Get set of (row, col) positions occupied by shape when placed at offset."""
+    cells = set()
+    for r, row in enumerate(shape):
+        for c, char in enumerate(row):
+            if char == '#':
+                cells.add((row_offset + r, col_offset + c))
+    return cells
+
 def solve_region(width, length, shape_variants_list, required_counts):
     """Try to fit all required shapes into a region using backtracking."""
-    # Create grid (length x width)
-    grid = [['.' for _ in range(width)] for _ in range(length)]
+    # Use a set to track occupied cells for faster overlap checking
+    occupied = set()
     
     # Flatten shape variants and required counts into a list of shapes to place
     shapes_to_place = []
     for shape_idx, count in enumerate(required_counts):
-        for _ in range(count):
-            shapes_to_place.append((shape_idx, shape_variants_list[shape_idx]))
+        if count > 0 and shape_idx < len(shape_variants_list) and shape_variants_list[shape_idx]:
+            for _ in range(count):
+                shapes_to_place.append((shape_idx, shape_variants_list[shape_idx]))
     
     if not shapes_to_place:
         return True
+    
+    # Sort shapes by size (larger first) to prune search space faster
+    def get_shape_size(variants):
+        if not variants:
+            return 0
+        # Count number of '#' cells
+        return sum(row.count('#') for row in variants[0])
+    
+    shapes_to_place.sort(key=lambda x: get_shape_size(x[1]), reverse=True)
     
     def backtrack(shape_idx):
         if shape_idx >= len(shapes_to_place):
@@ -245,19 +255,26 @@ def solve_region(width, length, shape_variants_list, required_counts):
         
         # Try each variant of this shape
         for variant in variants:
+            variant_rows = len(variant)
+            variant_cols = len(variant[0])
+            
             # Try placing at each position
-            for row in range(length):
-                for col in range(width):
-                    if can_place_shape(grid, variant, row, col, width, length):
+            for row in range(length - variant_rows + 1):
+                for col in range(width - variant_cols + 1):
+                    # Get cells this variant would occupy
+                    cells = get_shape_cells_set(variant, row, col)
+                    
+                    # Check for overlap
+                    if cells.isdisjoint(occupied):
                         # Place the shape
-                        place_shape(grid, variant, row, col, shape_type)
+                        occupied.update(cells)
                         
                         # Recursively try to place remaining shapes
                         if backtrack(shape_idx + 1):
                             return True
                         
                         # Backtrack: remove the shape
-                        remove_shape(grid, variant, row, col)
+                        occupied.difference_update(cells)
         
         return False
     
@@ -276,7 +293,8 @@ def solve(data):
     
     # Count how many regions can fit all their presents
     count = 0
-    for width, length, required_counts in regions:
+    total_regions = len(regions)
+    for idx, (width, length, required_counts) in enumerate(regions):
         # Get variants for shapes that are needed
         max_shape_idx = len(required_counts) - 1
         shape_variants_list = []
@@ -288,6 +306,9 @@ def solve(data):
         
         if solve_region(width, length, shape_variants_list, required_counts):
             count += 1
+        
+        if (idx + 1) % 10 == 0:
+            print(f"Processed {idx + 1}/{total_regions} regions, {count} solvable so far...")
     
     return count
 
