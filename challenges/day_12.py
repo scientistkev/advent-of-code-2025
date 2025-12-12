@@ -36,6 +36,10 @@
 
 # How many different paths lead from you to out?
 
+from collections import defaultdict, deque
+from itertools import pairwise
+from math import prod
+
 def load_data(path):
     with open(path, "r") as f:
         return [line.rstrip("\n") for line in f.readlines()]
@@ -51,35 +55,57 @@ def parse_input(data):
         graph[device] = outputs
     return graph
 
-def find_all_paths(graph, start, end, path=None):
-    """Find all paths from start to end using DFS."""
-    if path is None:
-        path = []
-    
-    path = path + [start]
-    
-    # If we've reached the end, return this path
-    if start == end:
-        return [path]
-    
-    # If start is not in graph, no paths exist
-    if start not in graph:
-        return []
-    
-    paths = []
-    # Explore all neighbors
-    for neighbor in graph[start]:
-        if neighbor not in path:  # Avoid cycles
-            new_paths = find_all_paths(graph, neighbor, end, path)
-            paths.extend(new_paths)
-    
-    return paths
+def karp(edge_dict: dict[str, list[str]]) -> list[str]:
+    """Topological sort using Kahn's algorithm."""
+    in_degrees = defaultdict(int)
+    queue = deque()
+    sorted_nodes = []
+
+    # Count in-degrees
+    for nodes in edge_dict.values():
+        for node in nodes:
+            in_degrees[node] += 1
+
+    # Initialize nodes with no incoming edges
+    for node in edge_dict.keys():
+        if node not in in_degrees:
+            in_degrees[node] = 0
+
+    # Add nodes with no incoming edges to queue
+    for node, in_degree in in_degrees.items():
+        if not in_degree:
+            queue.append(node)
+
+    # Process nodes in topological order
+    while queue:
+        node = queue.popleft()
+        sorted_nodes.append(node)
+        if node in edge_dict:
+            for destination in edge_dict[node]:
+                in_degrees[destination] -= 1
+                if not in_degrees[destination]:
+                    queue.append(destination)
+
+    return sorted_nodes
+
+def ways(edge_dict: dict[str, list[str]], source: str, destination: str) -> int:
+    """Count number of paths from source to destination using dynamic programming."""
+    sorted_nodes = karp(edge_dict)
+
+    ways_ = {node: 0 for node in sorted_nodes}
+    ways_[source] = 1
+
+    for node in sorted_nodes:
+        if node in edge_dict:
+            for neighbor in edge_dict[node]:
+                ways_[neighbor] += ways_[node]
+
+    return ways_[destination]
 
 def count_paths(data):
     """Count all paths from 'you' to 'out'."""
     graph = parse_input(data)
-    paths = find_all_paths(graph, "you", "out")
-    return len(paths)
+    return ways(graph, "you", "out")
 
 # --- Part Two ---
 # Thanks in part to your analysis, the Elves have figured out a little bit about the issue. They now know that the problematic data path passes through both dac (a digital-to-analog converter) and fft (a device which performs a fast Fourier transform).
@@ -115,26 +141,21 @@ def count_paths(data):
 
 # Find all of the paths that lead from svr to out. How many of those paths visit both dac and fft?
 
-def count_paths_with_required_nodes(data, start, end, required_nodes):
-    """Count all paths from start to end that visit all required nodes."""
-    graph = parse_input(data)
-    all_paths = find_all_paths(graph, start, end)
-    
-    # Filter paths that contain all required nodes
-    valid_paths = []
-    for path in all_paths:
-        if all(node in path for node in required_nodes):
-            valid_paths.append(path)
-    
-    return len(valid_paths)
 
 if __name__ == "__main__":
     data = load_data("data/day_12_input.txt")
+    graph = parse_input(data)
     
     # Part 1
-    result = count_paths(data)
+    result = ways(graph, "you", "out")
     print(f"Number of different paths from you to out: {result}")
     
     # Part 2
-    result2 = count_paths_with_required_nodes(data, "svr", "out", ["dac", "fft"])
+    result2 = sum(
+        prod(ways(graph, source, dest) for source, dest in pairwise(route))
+        for route in [
+            ["svr", "fft", "dac", "out"],
+            ["svr", "dac", "fft", "out"],
+        ]
+    )
     print(f"Number of paths from svr to out that visit both dac and fft: {result2}")
