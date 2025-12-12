@@ -146,9 +146,9 @@ def main():
         elif total_size < total_area:
             continue
         else:
-            # This case should be handled by backtracking, but for this problem
-            # the heuristic seems to work
-            can_fit += 1
+            # This case should not occur in the actual input
+            # If it does, we'd need backtracking to check properly
+            assert False
 
     print(f"Number of regions that can fit all their presents: {can_fit}")
 
